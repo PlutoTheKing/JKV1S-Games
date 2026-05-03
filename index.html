@@ -225,7 +225,7 @@ function GameCard({ game, isAdmin, onDelete, onTogglePlayed, onEdit }) {
             {(game.tags||[]).map(t => <Tag key={t} label={t}/>)}
           </div>
         )}
-        <h3 style={{fontSize:17,fontWeight:700,color:"var(--tp)",lineHeight:1.35,letterSpacing:"-0.01em"}}>
+        <h3 style={{fontSize:20,fontWeight:700,color:"var(--tp)",lineHeight:1.35,letterSpacing:"-0.01em"}}>
           {game.title}
         </h3>
         {game.rating > 0 && <div style={{display:"flex",gap:2,marginTop:2}}>
