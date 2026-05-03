@@ -323,18 +323,13 @@ function AddForm({ onAdd, onClose, initialData, onUpdate }) {
     if (!titleTouched.current)  setTitle(p.suggestedName);
     if (!bannerTouched.current) setBanner(p.bannerUrl);
 
-    // Steam API ueber CORS-Proxy abrufen
+    // Steam API via Render Proxy
     setImgLoading(true);
-    const apiUrl = `https://store.steampowered.com/api/getappdetails?appids=${p.appId}&filters=basic`;
-    fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`)
+    fetch(`https://steam-proxy-oivi.onrender.com/?appid=${p.appId}`)
       .then(r => r.json())
       .then(data => {
-        const steam = JSON.parse(data.contents);
-        const info  = steam[p.appId];
-        if (info?.success && info.data) {
-          if (!bannerTouched.current && info.data.header_image) setBanner(info.data.header_image);
-          if (!titleTouched.current  && info.data.name)         setTitle(info.data.name);
-        }
+        if (!bannerTouched.current && data.header_image) setBanner(data.header_image);
+        if (!titleTouched.current  && data.name)         setTitle(data.name);
       })
       .catch(() => {})
       .finally(() => setImgLoading(false));
