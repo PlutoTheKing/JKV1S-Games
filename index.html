@@ -296,7 +296,6 @@ function AddForm({ onAdd, onClose, initialData, onUpdate }) {
   const [parsed,     setParsed]     = useState(null);
   const [err,        setErr]        = useState("");
   const [saving,     setSaving]     = useState(false);
-  const [imgLoading, setImgLoading] = useState(false);
   const titleTouched  = useRef(false);
   const bannerTouched = useRef(false);
 
@@ -323,16 +322,7 @@ function AddForm({ onAdd, onClose, initialData, onUpdate }) {
     if (!titleTouched.current)  setTitle(p.suggestedName);
     if (!bannerTouched.current) setBanner(p.bannerUrl);
 
-    // Steam API via Render Proxy
-    setImgLoading(true);
-    fetch(`https://steam-proxy-oivi.onrender.com/?appid=${p.appId}`)
-      .then(r => r.json())
-      .then(data => {
-        if (!bannerTouched.current && data.header_image) setBanner(data.header_image);
-        if (!titleTouched.current  && data.name)         setTitle(data.name);
-      })
-      .catch(() => {})
-      .finally(() => setImgLoading(false));
+
   }, [url]);
 
   async function submit() {
@@ -379,25 +369,35 @@ function AddForm({ onAdd, onClose, initialData, onUpdate }) {
 
       <div style={{marginBottom:12}}>
         <label style={lbl}>Steam URL</label>
-        <input placeholder="https://store.steampowered.com/app/…"
-          value={url} onChange={e => setUrl(e.target.value)}/>
+        <div style={{display:"flex",gap:8}}>
+          <input placeholder="https://store.steampowered.com/app/…"
+            value={url} onChange={e => setUrl(e.target.value)} style={{flex:1}}/>
+          {parsed?.steamUrl && (
+            <a href={parsed.steamUrl} target="_blank" rel="noopener noreferrer"
+              title="Steam Seite öffnen → Rechtsklick auf Banner → Bildadresse kopieren"
+              style={{background:"#1b2838",border:"1px solid var(--cb)",borderRadius:8,
+                padding:"0 12px",display:"flex",alignItems:"center",flexShrink:0,
+                color:"var(--ts)",fontSize:12,textDecoration:"none",gap:5,whiteSpace:"nowrap"}}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="#1b2838" stroke="#4a90d9" strokeWidth="1.5"/>
+                <path d="M8 12l2.5 2.5L16 9" stroke="#4a90d9" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+              Steam öffnen
+            </a>
+          )}
+        </div>
+        {parsed?.steamUrl && !banner && (
+          <p style={{fontSize:11,color:"var(--ts)",marginTop:5}}>
+            💡 Steam Seite öffnen → Rechtsklick auf das Banner-Bild → "Bildadresse kopieren" → in Banner URL einfügen
+          </p>
+        )}
       </div>
 
-      {/* Bildvorschau + Ladezustand */}
-      {(banner || imgLoading) && (
-        <div style={{marginBottom:12,borderRadius:8,overflow:"hidden",border:"1px solid var(--cbh)",position:"relative",minHeight:88}}>
-          {imgLoading && (
-            <div style={{position:"absolute",inset:0,background:"#10121c",display:"flex",alignItems:"center",justifyContent:"center",gap:8,zIndex:1}}>
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{animation:"spin 1s linear infinite"}}>
-                <circle cx="8" cy="8" r="6" stroke="#7c5cfc" strokeWidth="2" strokeDasharray="20 18"/>
-              </svg>
-              <span style={{fontSize:12,color:"var(--ts)"}}>Bild wird geladen…</span>
-            </div>
-          )}
-          {banner && <img src={banner} alt="" style={{width:"100%",height:88,objectFit:"cover",display:"block",opacity:imgLoading?0:1,transition:"opacity 0.3s"}}/>}
+      {banner && (
+        <div style={{marginBottom:12,borderRadius:8,overflow:"hidden",border:"1px solid var(--cbh)"}}>
+          <img src={banner} alt="" style={{width:"100%",height:88,objectFit:"cover",display:"block"}}/>
         </div>
       )}
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
 
       <div style={{marginBottom:12}}>
         <label style={lbl}>Titel</label>
