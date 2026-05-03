@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>JKV1S Games</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#111318;--surf:#1a1d27;--card:#1c1f2e;--cb:#282d42;--cbh:#3e4566;
+      --acc:#7c5cfc;--accdim:#281e54;--tp:#dde3f5;--ts:#8090b8;--tm:#505878;
+      --rel:#22c55e;--relbg:#071f10;--unrel:#f59e0b;--unreldg:#1f1200;
+    }
+    html,body{background:var(--bg);color:var(--tp);font-family:-apple-system,'Segoe UI',system-ui,sans-serif;min-height:100vh}
+    input{background:#181b27;border:1px solid var(--cb);border-radius:8px;color:var(--tp);padding:8px 12px;font-size:13px;outline:none;width:100%}
+    input:focus{border-color:var(--acc)}
+    button{cursor:pointer;border:none;border-radius:7px;font-size:13px;font-weight:500;transition:all 0.15s}
+    #root{min-height:100vh}
+    @keyframes pulse-border{
+      0%,100%{box-shadow:0 0 0 2px #7c5cfc,0 0 12px rgba(124,92,252,0.4)}
+      50%{box-shadow:0 0 0 3px #7c5cfc,0 0 22px rgba(124,92,252,0.7)}
+    }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- ── CDN Libraries ── -->
+<script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel">
+// ════════════════════════════════════════════════
+//  🔧 HIER DEINE SUPABASE DATEN EINTRAGEN
+// ════════════════════════════════════════════════
+const SUPABASE_URL  = "https://dwsiqlzqansmuvmozvjn.supabase.co";
+const SUPABASE_KEY  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR3c2lxbHpxYW5zbXV2bW96dmpuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2NzUwNjEsImV4cCI6MjA5MzI1MTA2MX0.6GYfaX4aHznkFupIcNGZpQjx2J4ikuuza-agcZ2CiPo";
+// ════════════════════════════════════════════════
+
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const { useState, useEffect, useRef } = React;
+
+const TAGS       = ["Horror","Story","Simulator","Cozy","VR","Neu"];
+const FORM_TAGS  = ["Horror","Story","Simulator","Cozy","VR","Neu"];
+const FORM_MODES = ["Single player","Multiplayer","Co-operative","Split screen","Battle Royale"];
+
+const TC = {
+  Horror:     { bg:"#200808", c:"#ff7070", b:"#5a1010" },
+  Story:      { bg:"#081428", c:"#6ab0ff", b:"#163060" },
+  Simulator:  { bg:"#082010", c:"#4ade80", b:"#104a22" },
+  Cozy:       { bg:"#221208", c:"#fb923c", b:"#7a2808" },
+  VR:         { bg:"#160824", c:"#c084fc", b:"#541880" },
+  Multiplayer:{ bg:"#061c24", c:"#22d3ee", b:"#0e3e50" },
+  "Co-op":    { bg:"#081422", c:"#38bdf8", b:"#064e78" },
+  Neu:        { bg:"#220816", c:"#f472b6", b:"#7a0e38" },
+};
+
+const MW = { maxWidth: 980, margin: "0 auto", padding: "0 24px" };
+const PURPLE = "#7c5cfc";
+
+// ── Helpers ──────────────────────────────────────
+function parseUrl(u) {
+  if (!u) return null;
+  const m = u.trim().match(/store\.steampowered\.com\/app\/(\d+)\/?([^/?#]*)?/);
+  if (!m) return null;
+  const id   = m[1];
+  const slug = (m[2] || "").replace(/_/g," ").replace(/-/g," ").trim();
+  return {
+    appId: id,
+    suggestedName: slug,
+    bannerUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${id}/header.jpg`,
+    steamUrl:  `https://store.steampowered.com/app/${id}/`,
+  };
+}
+
+// ── Sub-components ────────────────────────────────
+
+function Tag({ label }) {
+  const c = TC[label] || { bg:"#181c2a", c:"#8090b8", b:"#282d42" };
+  return (
+    <span style={{display:"inline-block",background:c.bg,color:c.c,
+      border:`1px solid ${c.b}`,borderRadius:5,padding:"3px 9px",fontSize:11,fontWeight:500}}>
+      {label}
+    </span>
+  );
+}
+
+function Dropdown({ value, onChange, options }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+  const sel = options.find(o => o.value === value) || options[0];
+  return (
+    <div ref={ref} style={{position:"relative"}}>
+      <button onClick={() => setOpen(p => !p)} style={{
+        background:"#181b27",border:"1px solid var(--cb)",color:"var(--tp)",
+        padding:"7px 13px",borderRadius:8,display:"flex",alignItems:"center",
+        gap:7,whiteSpace:"nowrap",fontSize:13,fontWeight:500
+      }}>
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+          <circle cx="5.5" cy="3.5" r="2.5" stroke="var(--ts)" strokeWidth="1.4"/>
+          <path d="M1 12c0-2.5 2-4 4.5-4s4.5 1.5 4.5 4" stroke="var(--ts)" strokeWidth="1.4" strokeLinecap="round"/>
+          <path d="M10 6l2 2M10 8l2-2" stroke="var(--ts)" strokeWidth="1.3" strokeLinecap="round"/>
+        </svg>
+        {sel.label}
+        <svg width="9" height="9" viewBox="0 0 10 10" fill="none"
+          style={{transform:open?"rotate(180deg)":"none",transition:"transform 0.2s"}}>
+          <path d="M2 3.5L5 6.5L8 3.5" stroke="var(--ts)" strokeWidth="1.5" strokeLinecap="round"/>
+        </svg>
+      </button>
+      {open && (
+        <div style={{position:"absolute",top:"calc(100% + 5px)",right:0,background:"#1e2130",
+          border:"1px solid var(--cb)",borderRadius:9,overflow:"hidden",zIndex:50,
+          minWidth:185,boxShadow:"0 8px 28px rgba(0,0,0,0.55)"}}>
+          {options.map(o => (
+            <button key={o.value} onClick={() => { onChange(o.value); setOpen(false); }} style={{
+              display:"flex",alignItems:"center",justifyContent:"space-between",
+              width:"100%",padding:"10px 15px",
+              background:value===o.value?"rgba(124,92,252,0.1)":"transparent",
+              color:value===o.value?"var(--tp)":"var(--ts)",fontSize:13,borderRadius:0,textAlign:"left"
+            }}>
+              {o.label}
+              {value === o.value && (
+                <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                  <path d="M2.5 6L5 8.5L9.5 4" stroke="#7c5cfc" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function getSteamFallbacks(game) {
+  const urls = [];
+  if (game.banner_url) urls.push(game.banner_url);
+  const m = (game.steam_url || "").match(/\/app\/(\d+)/);
+  if (m) {
+    const id = m[1];
+    [
+      `https://cdn.cloudflare.steamstatic.com/steam/apps/${id}/header.jpg`,
+      `https://steamcdn-a.akamaihd.net/steam/apps/${id}/header.jpg`,
+      `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${id}/header.jpg`,
+      `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${id}/header.jpg`,
+    ].forEach(u => { if (!urls.includes(u)) urls.push(u); });
+  }
+  return urls;
+}
+
+function GameCard({ game, isAdmin, onDelete, onTogglePlayed, onEdit }) {
+  const fallbacks        = getSteamFallbacks(game);
+  const [imgIdx, setImgIdx] = useState(0);
+  const [del,    setDel]    = useState(false);
+  const played  = game.played  || false;
+  const playing = game.playing || false;
+  const imgSrc  = fallbacks[imgIdx] || null;
+  return (
+    <div
+      style={{background:"var(--card)",
+        border: playing ? "2px solid #7c5cfc" : "1px solid var(--cb)",
+        borderRadius:12, overflow:"hidden", display:"flex", flexDirection:"column",
+        position:"relative", transition:"border-color 0.2s,transform 0.18s,box-shadow 0.2s",
+        animation: playing ? "pulse-border 2s ease-in-out infinite" : "none"}}
+      onMouseEnter={e => { if (!played && !playing) {
+        e.currentTarget.style.borderColor = "var(--cbh)";
+        e.currentTarget.style.transform   = "translateY(-3px)";
+        e.currentTarget.style.boxShadow   = "0 10px 28px rgba(0,0,0,0.45)";
+      }}}
+      onMouseLeave={e => { if (!playing) {
+        e.currentTarget.style.borderColor = "var(--cb)";
+        e.currentTarget.style.transform   = "none";
+        e.currentTarget.style.boxShadow   = "none";
+      }}}
+    >
+      <a href={game.steam_url || "#"} target="_blank" rel="noopener noreferrer"
+        style={{display:"block",position:"relative",flexShrink:0}}>
+        {imgSrc
+          ? <img src={imgSrc} alt={game.title}
+              onError={() => setImgIdx(i => i + 1)}
+              style={{width:"100%",height:160,objectFit:"cover",display:"block",
+                filter:played?"grayscale(0.9) brightness(0.4)":"none",transition:"filter 0.3s"}}/>
+          : <div style={{width:"100%",height:160,background:"#10121c",display:"flex",
+              alignItems:"center",justifyContent:"center"}}>
+              <span style={{color:"var(--tm)",fontSize:11}}>{game.title}</span>
+            </div>
+        }
+        {played && (
+          <div style={{position:"absolute",bottom:8,right:8,width:26,height:26,borderRadius:"50%",
+            background:"#22c55e",display:"flex",alignItems:"center",justifyContent:"center",
+            boxShadow:"0 0 0 2px #111318"}}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M2 6L4.8 8.8L10 3.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+        )}
+        {playing && (
+          <div style={{position:"absolute",top:8,left:8,background:"#7c5cfc",
+            borderRadius:5,padding:"3px 9px",display:"flex",alignItems:"center",gap:5}}>
+            <div style={{width:7,height:7,borderRadius:"50%",background:"#fff",
+              animation:"pulse-border 1s ease-in-out infinite"}}/>
+            <span style={{fontSize:10,fontWeight:700,color:"#fff",letterSpacing:"0.06em"}}>SPIELT GERADE</span>
+          </div>
+        )}
+      </a>
+
+      <div style={{padding:"11px 13px 13px",flex:1,display:"flex",flexDirection:"column",
+        gap:6,opacity:played?0.45:1,transition:"opacity 0.3s"}}>
+        {((game.modes||[]).length > 0 || (game.tags||[]).length > 0) && (
+          <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+            {(game.modes||[]).map(m => (
+              <span key={m} style={{display:"inline-block",background:"#12182a",color:"var(--ts)",
+                border:"1px solid var(--cb)",borderRadius:5,padding:"2px 7px",fontSize:10,fontWeight:500}}>
+                {m}
+              </span>
+            ))}
+            {(game.tags||[]).map(t => <Tag key={t} label={t}/>)}
+          </div>
+        )}
+        <h3 style={{fontSize:14,fontWeight:700,color:"var(--tp)",lineHeight:1.35,letterSpacing:"-0.01em"}}>
+          {game.title}
+        </h3>
+        {game.rating > 0 && <div style={{display:"flex",gap:2,marginTop:2}}>
+          {[1,2,3,4,5].map(n => <span key={n} style={{fontSize:12,color:game.rating>=n?"#f59e0b":"#3a3f58"}}>&#9733;</span>)}
+        </div>}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:"auto",paddingTop:6,gap:8}}>
+          <span style={{fontSize:12,color:"var(--ts)",lineHeight:1.4,flex:1}}>{game.note ? "mit " + game.note : ""}</span>
+          {isAdmin && !del && (
+            <button onClick={() => onTogglePlayed(game)} style={{
+              background: played?"rgba(34,197,94,0.18)":playing?"rgba(124,92,252,0.18)":"transparent",
+              color: played?"#22c55e":playing?"#7c5cfc":"var(--tm)",
+              border:`1px solid ${played?"#1a5e30":playing?"#7c5cfc":"var(--cb)"}`,
+              borderRadius:5,padding:"3px 9px",fontSize:11,fontWeight:600,
+              flexShrink:0,cursor:"pointer"
+            }}>
+              {played ? "✓ gespielt" : playing ? "▶ spielt gerade" : "○ gespielt?"}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {isAdmin && (
+        <div style={{position:"absolute",top:6,left:6,display:"flex",gap:4}}>
+          {del
+            ? <>
+                <button onClick={() => { onDelete(game.id); setDel(false); }}
+                  style={{background:"rgba(220,50,50,0.95)",color:"#fff",padding:"3px 9px",fontSize:11,borderRadius:5}}>
+                  ✓ Ja
+                </button>
+                <button onClick={() => setDel(false)}
+                  style={{background:"rgba(20,23,35,0.92)",color:"#aaa",padding:"3px 8px",fontSize:11,borderRadius:5}}>
+                  ✕
+                </button>
+              </>
+            : <button onClick={() => setDel(true)} style={{background:"rgba(12,14,22,0.88)",color:"#f87171",
+                border:"1px solid #5a1010",width:22,height:22,fontSize:14,display:"flex",
+                alignItems:"center",justifyContent:"center",fontWeight:700,borderRadius:5}}>
+                ×
+              </button>
+          }
+        </div>
+      )}
+      {isAdmin && !del && (
+        <button onClick={() => onEdit(game)} style={{
+          position:"absolute",top:6,right:6,
+          background:"rgba(12,14,22,0.88)",color:"var(--ts)",
+          border:"1px solid var(--cb)",width:26,height:26,
+          display:"flex",alignItems:"center",justifyContent:"center",borderRadius:5
+        }} title="Bearbeiten">
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+            <path d="M8.5 1.5L10.5 3.5L4 10H2V8L8.5 1.5Z" stroke="var(--ts)" strokeWidth="1.4" strokeLinejoin="round"/>
+          </svg>
+        </button>
+      )}
+
+    </div>
+  );
+}
+
+function AddForm({ onAdd, onClose, initialData, onUpdate }) {
+  const [url,        setUrl]        = useState("");
+  const [title,      setTitle]      = useState("");
+  const [banner,     setBanner]     = useState("");
+  const [tags,       setTags]       = useState([]);
+  const [modes,      setModes]      = useState([]);
+  const [released,   setReleased]   = useState(true);
+  const [note,       setNote]       = useState("");
+  const [parsed,     setParsed]     = useState(null);
+  const [err,        setErr]        = useState("");
+  const [saving,     setSaving]     = useState(false);
+  const [imgLoading, setImgLoading] = useState(false);
+  const titleTouched  = useRef(false);
+  const bannerTouched = useRef(false);
+
+  // Prefill when editing existing game
+  useEffect(() => {
+    if (!initialData) return;
+    setTitle(initialData.title || "");
+    setBanner(initialData.banner_url || "");
+    setTags(initialData.tags || []);
+    setModes(initialData.modes || []);
+    setReleased(initialData.released !== false);
+    setNote(initialData.note || "");
+    titleTouched.current  = true;
+    bannerTouched.current = true;
+  }, []);
+
+  useEffect(() => {
+    const p = parseUrl(url);
+    setParsed(p);
+    setErr("");
+    if (!p) return;
+
+    // Sofort Fallback setzen
+    if (!titleTouched.current)  setTitle(p.suggestedName);
+    if (!bannerTouched.current) setBanner(p.bannerUrl);
+
+    // Steam API ueber CORS-Proxy abrufen
+    setImgLoading(true);
+    const apiUrl = `https://store.steampowered.com/api/getappdetails?appids=${p.appId}&filters=basic`;
+    fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`)
+      .then(r => r.json())
+      .then(data => {
+        const steam = JSON.parse(data.contents);
+        const info  = steam[p.appId];
+        if (info?.success && info.data) {
+          if (!bannerTouched.current && info.data.header_image) setBanner(info.data.header_image);
+          if (!titleTouched.current  && info.data.name)         setTitle(info.data.name);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setImgLoading(false));
+  }, [url]);
+
+  async function submit() {
+    if (!title.trim()) { setErr("Titel fehlt!"); return; }
+    if (!banner.trim()) { setErr("Banner URL fehlt – Steam URL eingeben"); return; }
+    setSaving(true);
+    if (initialData) {
+      await onUpdate(initialData.id, {
+        title:      title.trim(),
+        steam_url:  parsed?.steamUrl || url || initialData.steam_url,
+        banner_url: banner.trim(),
+        tags:       [...tags],
+        modes:      [...modes],
+        released,
+        note:       note.trim(),
+      });
+    } else {
+      await onAdd({
+        title:      title.trim(),
+        steam_url:  parsed?.steamUrl || url,
+        banner_url: banner.trim(),
+        tags:       [...tags],
+        modes:      [...modes],
+        released,
+        note:       note.trim(),
+        played:     false,
+      });
+    }
+    setSaving(false);
+  }
+
+  const lbl = { fontSize:11,color:"var(--ts)",fontWeight:600,display:"block",
+    marginBottom:6,letterSpacing:"0.05em",textTransform:"uppercase" };
+
+  return (
+    <div style={{background:"var(--surf)",border:"1px solid var(--cb)",borderRadius:12,padding:22,marginBottom:22}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+        <h3 style={{fontSize:15,fontWeight:700,color:"var(--tp)"}}>{initialData ? "Spiel bearbeiten" : "Spiel hinzufügen"}</h3>
+        <button onClick={onClose}
+          style={{background:"transparent",color:"var(--ts)",border:"1px solid var(--cb)",padding:"6px 14px"}}>
+          Abbrechen
+        </button>
+      </div>
+
+      <div style={{marginBottom:12}}>
+        <label style={lbl}>Steam URL</label>
+        <input placeholder="https://store.steampowered.com/app/…"
+          value={url} onChange={e => setUrl(e.target.value)}/>
+      </div>
+
+      {/* Bildvorschau + Ladezustand */}
+      {(banner || imgLoading) && (
+        <div style={{marginBottom:12,borderRadius:8,overflow:"hidden",border:"1px solid var(--cbh)",position:"relative",minHeight:88}}>
+          {imgLoading && (
+            <div style={{position:"absolute",inset:0,background:"#10121c",display:"flex",alignItems:"center",justifyContent:"center",gap:8,zIndex:1}}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{animation:"spin 1s linear infinite"}}>
+                <circle cx="8" cy="8" r="6" stroke="#7c5cfc" strokeWidth="2" strokeDasharray="20 18"/>
+              </svg>
+              <span style={{fontSize:12,color:"var(--ts)"}}>Bild wird geladen…</span>
+            </div>
+          )}
+          {banner && <img src={banner} alt="" style={{width:"100%",height:88,objectFit:"cover",display:"block",opacity:imgLoading?0:1,transition:"opacity 0.3s"}}/>}
+        </div>
+      )}
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+
+      <div style={{marginBottom:12}}>
+        <label style={lbl}>Titel</label>
+        <input placeholder="Game Titel" value={title}
+          onChange={e => { titleTouched.current = true; setTitle(e.target.value); }}/>
+      </div>
+
+      <div style={{marginBottom:12}}>
+        <label style={lbl}>Banner URL</label>
+        <input placeholder="https://cdn.cloudflare.steamstatic.com/…"
+          value={banner} onChange={e => { bannerTouched.current = true; setBanner(e.target.value); }}/>
+      </div>
+
+      <div style={{marginBottom:12}}>
+        <label style={lbl}>Spielmodus</label>
+        <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+          {FORM_MODES.map(m => {
+            const a = modes.includes(m);
+            return (
+              <button key={m}
+                onClick={() => setModes(p => p.includes(m) ? p.filter(x=>x!==m) : [...p,m])}
+                style={{background:a?"#12182a":"transparent",color:a?"var(--tp)":"var(--ts)",
+                  border:`1px solid ${a?"var(--cbh)":"var(--cb)"}`,borderRadius:6,padding:"5px 12px",fontSize:12}}>
+                {m}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={{marginBottom:12}}>
+        <label style={lbl}>Tags</label>
+        <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+          {FORM_TAGS.map(t => {
+            const a = tags.includes(t);
+            const c = TC[t] || { bg:"#181c2a", c:"#8090b8", b:"#282d42" };
+            return (
+              <button key={t}
+                onClick={() => setTags(p => p.includes(t) ? p.filter(x=>x!==t) : [...p,t])}
+                style={{background:a?c.bg:"transparent",color:a?c.c:"var(--ts)",
+                  border:`1px solid ${a?c.b:"var(--cb)"}`,borderRadius:6,padding:"5px 12px",fontSize:12}}>
+                {t}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={{marginBottom:12}}>
+        <label style={lbl}>Status</label>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={() => setReleased(true)}
+            style={{background:released?"var(--relbg)":"transparent",color:released?"var(--rel)":"var(--ts)",
+              border:`1px solid ${released?"#1a5e30":"var(--cb)"}`,padding:"7px 18px",fontWeight:600}}>
+            ✓ Released
+          </button>
+          <button onClick={() => setReleased(false)}
+            style={{background:!released?"var(--unreldg)":"transparent",color:!released?"var(--unrel)":"var(--ts)",
+              border:`1px solid ${!released?"#6b4004":"var(--cb)"}`,padding:"7px 18px",fontWeight:600}}>
+            ◷ Unreleased
+          </button>
+        </div>
+      </div>
+
+      <div style={{marginBottom:16}}>
+        <label style={lbl}>Mit wem gespielt? (optional)</label>
+        <input placeholder="PlutoTheKing, Basti, ..." value={note} onChange={e => setNote(e.target.value)}/>
+      </div>
+
+      {err && <p style={{color:"#f87171",fontSize:12,marginBottom:10}}>{err}</p>}
+
+      <button onClick={submit} disabled={saving}
+        style={{background:"var(--acc)",color:"#fff",padding:"11px 0",width:"100%",
+          fontSize:14,fontWeight:700,borderRadius:8,opacity:saving?0.6:1}}>
+        {saving ? "Wird gespeichert…" : (initialData ? "Speichern" : "Hinzufügen")}
+      </button>
+    </div>
+  );
+}
+
+
+function RatingModal({ game, onSave, onClose }) {
+  const [pick, setPick] = useState(game.rating || 0);
+  const [hover, setHover] = useState(0);
+  const active = hover || pick;
+  const labels = ["Kein Rating","1 Stern","2 Sterne","3 Sterne","4 Sterne","5 Sterne"];
+  const starStyle = n => ({
+    fontSize:32, cursor:"pointer", color: active>=n ? "#f59e0b" : "#3a3f58",
+    transition:"color 0.1s", userSelect:"none", lineHeight:1
+  });
+  return (
+    <div style={{background:"#1c1f2e",border:"1px solid #3e4566",borderRadius:14,
+      padding:"24px 28px",width:300,textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,0.6)"}}>
+      <p style={{fontSize:11,color:"#8090b8",fontWeight:600,letterSpacing:"0.05em",
+        textTransform:"uppercase",marginBottom:8}}>Bewertung</p>
+      <h3 style={{fontSize:15,fontWeight:700,color:"#dde3f5",marginBottom:20,lineHeight:1.35}}>
+        {game.title}
+      </h3>
+      <div style={{display:"flex",justifyContent:"center",gap:6,marginBottom:8}}>
+        <span style={starStyle(1)} onMouseEnter={()=>setHover(1)} onMouseLeave={()=>setHover(0)} onClick={()=>setPick(pick===1?0:1)}>&#9733;</span>
+        <span style={starStyle(2)} onMouseEnter={()=>setHover(2)} onMouseLeave={()=>setHover(0)} onClick={()=>setPick(pick===2?0:2)}>&#9733;</span>
+        <span style={starStyle(3)} onMouseEnter={()=>setHover(3)} onMouseLeave={()=>setHover(0)} onClick={()=>setPick(pick===3?0:3)}>&#9733;</span>
+        <span style={starStyle(4)} onMouseEnter={()=>setHover(4)} onMouseLeave={()=>setHover(0)} onClick={()=>setPick(pick===4?0:4)}>&#9733;</span>
+        <span style={starStyle(5)} onMouseEnter={()=>setHover(5)} onMouseLeave={()=>setHover(0)} onClick={()=>setPick(pick===5?0:5)}>&#9733;</span>
+      </div>
+      <p style={{fontSize:12,color:"#505878",marginBottom:20,minHeight:18}}>{labels[active]}</p>
+      <div style={{display:"flex",gap:8}}>
+        <button onClick={onClose}
+          style={{flex:1,padding:"9px 0",background:"transparent",color:"#8090b8",
+            border:"1px solid #282d42",borderRadius:8,fontSize:13,cursor:"pointer"}}>
+          Abbrechen
+        </button>
+        <button onClick={() => onSave(game.id, pick)}
+          style={{flex:2,padding:"9px 0",background:"#7c5cfc",color:"#fff",
+            border:"none",borderRadius:8,fontSize:13,fontWeight:700,cursor:"pointer"}}>
+          {game.played ? "Speichern" : "Als gespielt markieren"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Main App ──────────────────────────────────────
+function App() {
+  const [games,      setGames]      = useState([]);
+  const [isAdmin,    setIsAdmin]    = useState(false);
+  const [panel,      setPanel]      = useState("none");
+  const [email,      setEmail]      = useState("");
+  const [pw,         setPw]         = useState("");
+  const [loginErr,   setLoginErr]   = useState("");
+  const [loginLoad,  setLoginLoad]  = useState(false);
+  const [activeTags, setActiveTags] = useState([]);
+  const [modeFilter, setModeFilter] = useState("all");
+  const [relTab,     setRelTab]     = useState("released");
+  const [showPlayed, setShowPlayed] = useState(false);
+  const [search,     setSearch]     = useState("");
+  const [loading,    setLoading]    = useState(true);
+  const [saveMsg,    setSaveMsg]    = useState("");
+  const [editingGame,setEditingGame]= useState(null);
+  const [ratingGame, setRatingGame]  = useState(null);
+
+  // ── Load games from Supabase ──
+  useEffect(() => { loadGames(); }, []);
+
+  async function loadGames() {
+    setLoading(true);
+    const { data, error } = await sb.from("games").select("*").order("title");
+    if (error) { console.error(error); setSaveMsg("Verbindungsfehler!"); }
+    else setGames(data || []);
+    setLoading(false);
+  }
+
+  // ── Auth ──
+  async function login() {
+    if (!email || !pw) { setLoginErr("Email und Passwort eingeben"); return; }
+    setLoginLoad(true);
+    setLoginErr("");
+    const { error } = await sb.auth.signInWithPassword({ email, password: pw });
+    setLoginLoad(false);
+    if (error) { setLoginErr("Falsches Email oder Passwort"); }
+    else { setIsAdmin(true); setPanel("none"); setEmail(""); setPw(""); setLoginErr(""); }
+  }
+
+  // ── CRUD ──
+  async function addGame(game) {
+    setSaveMsg("…");
+    const newGame = { ...game, id: Date.now() + "_" + Math.random().toString(36).slice(2,6) };
+    const { error } = await sb.from("games").insert([newGame]);
+    if (error) { setSaveMsg("Fehler!"); console.error(error); return; }
+    setSaveMsg("✓"); setTimeout(() => setSaveMsg(""), 1800);
+    await loadGames();
+    setPanel("none");
+  }
+
+  async function deleteGame(id) {
+    setSaveMsg("…");
+    const { error } = await sb.from("games").delete().eq("id", id);
+    if (error) { setSaveMsg("Fehler!"); return; }
+    setSaveMsg("✓"); setTimeout(() => setSaveMsg(""), 1800);
+    setGames(prev => prev.filter(g => g.id !== id));
+  }
+
+  async function updateGame(id, data) {
+    setSaveMsg("…");
+    const { error } = await sb.from("games").update(data).eq("id", id);
+    if (error) { setSaveMsg("Fehler!"); console.error(error); return; }
+    setSaveMsg("✓"); setTimeout(() => setSaveMsg(""), 1800);
+    await loadGames();
+    setEditingGame(null);
+    setPanel("none");
+  }
+
+  async function setPlaying(id) {
+    const game = games.find(g => g.id === id);
+    if (!game) return;
+    const newVal = !game.playing;
+    const { error } = await sb.from("games").update({ playing: newVal }).eq("id", id);
+    if (error) { console.error(error); return; }
+    setGames(prev => prev.map(g => g.id === id ? { ...g, playing: newVal } : g));
+  }
+
+  function openRating(game) {
+    if (!game.playing && !game.played) {
+      setPlaying(game.id);
+    } else {
+      setRatingGame(game);
+    }
+  }
+
+  async function saveRating(id, rating) {
+    const updates = { played: true, playing: false, rating: rating > 0 ? rating : null };
+    const { error } = await sb.from("games").update(updates).eq("id", id);
+    if (error) { console.error(error); return; }
+    setGames(prev => prev.map(g => g.id === id ? { ...g, ...updates } : g));
+    setRatingGame(null);
+  }
+
+  // ── Filter ──
+  const playedCount = games.filter(g => g.played).length;
+  const modeOptions = [{ value:"all", label:"Alle Modi" }, ...FORM_MODES.map(m => ({ value:m, label:m }))];
+
+  const filtered = games.filter(g => {
+    if (!showPlayed && g.played)                                           return false;
+    if (relTab === "released"   && !g.released)                           return false;
+    if (relTab === "unreleased" &&  g.released)                           return false;
+    if (activeTags.length && !activeTags.some(t => (g.tags||[]).includes(t))) return false;
+    if (modeFilter !== "all"   && !(g.modes||[]).includes(modeFilter))    return false;
+    if (search.trim() && !g.title.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
+
+  return (
+    <div style={{background:"var(--bg)",minHeight:"100vh"}}>
+
+      {/* ── HEADER ── */}
+      <div style={{background:"#13151e",borderBottom:"1px solid var(--cb)"}}>
+        <div style={{...MW,display:"flex",alignItems:"center",gap:10,height:54}}>
+          <span style={{fontSize:20,fontWeight:800,color:"var(--tp)",letterSpacing:"-0.03em",flexShrink:0}}>JKV1S</span>
+          <span style={{fontSize:13,color:"var(--ts)",flexShrink:0}}>Games</span>
+          <span style={{background:"var(--accdim)",color:"var(--acc)",borderRadius:20,
+            padding:"2px 9px",fontSize:11,fontWeight:700,flexShrink:0}}>
+            {games.length}
+          </span>
+          <div style={{width:1,height:18,background:"var(--cb)",flexShrink:0,margin:"0 2px"}}/>
+
+          {/* Search */}
+          <div style={{position:"relative",flex:"1 1 130px",maxWidth:210}}>
+            <svg style={{position:"absolute",left:9,top:"50%",transform:"translateY(-50%)",pointerEvents:"none"}}
+              width="12" height="12" viewBox="0 0 13 13" fill="none">
+              <circle cx="5.5" cy="5.5" r="4" stroke="var(--ts)" strokeWidth="1.5"/>
+              <path d="M9 9L11 11" stroke="var(--ts)" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            <input placeholder="Suche…" value={search} onChange={e => setSearch(e.target.value)}
+              style={{paddingLeft:28,height:34}}/>
+          </div>
+
+          {/* Gespielte */}
+          <button onClick={() => setShowPlayed(p => !p)} style={{
+            display:"flex",alignItems:"center",gap:7,
+            background:showPlayed?"rgba(124,92,252,0.1)":"transparent",
+            color:showPlayed?PURPLE:"var(--ts)",
+            border:`1px solid ${showPlayed?PURPLE:"var(--cb)"}`,
+            borderRadius:7,padding:"6px 12px",flexShrink:0,whiteSpace:"nowrap"
+          }}>
+            <div style={{width:15,height:15,borderRadius:3,
+              border:`1.5px solid ${showPlayed?PURPLE:"var(--ts)"}`,
+              background:showPlayed?PURPLE:"transparent",
+              display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              {showPlayed && (
+                <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
+                  <path d="M1.2 4.5L3.5 6.8L7.8 2.2" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
+            </div>
+            <span style={{fontSize:12}}>Gespielte{playedCount > 0 && ` (${playedCount})`}</span>
+          </button>
+
+          <div style={{flex:1}}/>
+          {saveMsg && <span style={{fontSize:12,color:saveMsg==="✓"?"var(--rel)":"var(--ts)",flexShrink:0}}>{saveMsg}</span>}
+          {isAdmin && panel !== "add" && (
+            <button onClick={() => setPanel("add")}
+              style={{background:"var(--acc)",color:"#fff",padding:"7px 14px",fontWeight:600,flexShrink:0,borderRadius:7}}>
+              + Spiel
+            </button>
+          )}
+          {isAdmin && (
+            <button onClick={async () => { await sb.auth.signOut(); setIsAdmin(false); setPanel("none"); }}
+              style={{background:"transparent",color:"var(--ts)",border:"1px solid var(--cb)",padding:"7px 12px",flexShrink:0,borderRadius:7}}>
+              Logout
+            </button>
+          )}
+          {!isAdmin && (
+            <button onClick={() => setPanel(p => p === "login" ? "none" : "login")}
+              style={{background:"transparent",color:"var(--ts)",border:"1px solid var(--cb)",padding:"7px 14px",flexShrink:0,borderRadius:7}}>
+              Admin
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── CONTENT ── */}
+      <div style={{...MW, paddingTop:18, paddingBottom:48}}>
+
+        {/* Login */}
+        {panel === "login" && (
+          <div style={{background:"var(--surf)",border:"1px solid var(--cb)",borderRadius:10,
+            padding:"14px 16px",marginBottom:16,maxWidth:340}}>
+            <p style={{fontSize:11,color:"var(--ts)",marginBottom:10,fontWeight:600,
+              letterSpacing:"0.05em",textTransform:"uppercase"}}>Admin-Login</p>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              <input type="email" placeholder="Email" value={email}
+                onChange={e => setEmail(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && login()}/>
+              <div style={{display:"flex",gap:8}}>
+                <input type="password" placeholder="Passwort" value={pw}
+                  onChange={e => setPw(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && login()} style={{flex:1}}/>
+                <button onClick={login} disabled={loginLoad}
+                  style={{background:"var(--acc)",color:"#fff",padding:"0 16px",
+                    flexShrink:0,fontWeight:600,borderRadius:7,opacity:loginLoad?0.6:1}}>
+                  {loginLoad ? "…" : "Login"}
+                </button>
+              </div>
+            </div>
+            {loginErr && <p style={{color:"#f87171",fontSize:12,marginTop:6}}>{loginErr}</p>}
+          </div>
+        )}
+
+        {/* Add Form */}
+        {panel === "add" && isAdmin && !editingGame && <AddForm onAdd={addGame} onClose={() => setPanel("none")}/>}
+        {editingGame && isAdmin && <AddForm
+          initialData={editingGame}
+          onUpdate={updateGame}
+          onAdd={addGame}
+          onClose={() => { setEditingGame(null); setPanel("none"); }}
+        />}
+
+        {/* Tags + Alle Modi */}
+        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:16}}>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6,flex:1,alignItems:"center"}}>
+            {TAGS.map(t => {
+              const a = activeTags.includes(t);
+              const c = TC[t] || { bg:"#181c2a", c:"#8090b8", b:"#282d42" };
+              return (
+                <button key={t}
+                  onClick={() => setActiveTags(p => p.includes(t) ? p.filter(x=>x!==t) : [...p,t])}
+                  style={{background:a?c.bg:"transparent",color:a?c.c:"var(--ts)",
+                    border:`1px solid ${a?c.b:"var(--cb)"}`,borderRadius:20,
+                    padding:"6px 16px",fontSize:12,fontWeight:600,opacity:a?1:0.75,flexShrink:0}}>
+                  {t}
+                </button>
+              );
+            })}
+            {activeTags.length > 0 && (
+              <button onClick={() => setActiveTags([])}
+                style={{background:"transparent",color:"var(--tm)",border:"1px solid var(--cb)",
+                  borderRadius:20,padding:"6px 12px",fontSize:12,flexShrink:0}}>✕</button>
+            )}
+          </div>
+          <div style={{flexShrink:0}}>
+            <Dropdown value={modeFilter} onChange={setModeFilter} options={modeOptions}/>
+          </div>
+        </div>
+
+        {/* Released / Unreleased Tabs */}
+        <div style={{display:"flex",borderBottom:"1px solid var(--cb)",marginBottom:20}}>
+          {[["released","Released"],["unreleased","Unreleased"]].map(([val,label],i) => {
+            const active = relTab === val;
+            return (
+              <button key={val} onClick={() => setRelTab(val)} style={{
+                flex:1,padding:"13px 0",fontSize:15,fontWeight:active?700:400,
+                background:active?"rgba(124,92,252,0.05)":"transparent",
+                color:active?"var(--tp)":"var(--ts)",border:"none",
+                borderBottom:`2.5px solid ${active?PURPLE:"transparent"}`,
+                borderRight:i===0?"1px solid var(--cb)":"none",
+                borderRadius:0,marginBottom:-1,letterSpacing:"-0.01em",transition:"color 0.15s,background 0.15s"
+              }}>{label}</button>
+            );
+          })}
+        </div>
+
+        <p style={{fontSize:12,color:"var(--tm)",marginBottom:14}}>
+          {filtered.length} Spiel{filtered.length !== 1 ? "e" : ""}{isAdmin && " · Admin"}
+        </p>
+
+        {/* Grid */}
+        {loading
+          ? <p style={{color:"var(--ts)",textAlign:"center",padding:60}}>Lädt…</p>
+          : filtered.length === 0
+            ? <div style={{textAlign:"center",padding:"60px 20px"}}>
+                <p style={{fontSize:34,marginBottom:10}}>🎮</p>
+                <p style={{fontSize:14,color:"var(--ts)"}}>
+                  {games.length === 0
+                    ? "Noch keine Spiele – als Admin einloggen und loslegen!"
+                    : "Keine Spiele gefunden."}
+                </p>
+              </div>
+            : <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16}}>
+                {filtered.map(g => (
+                  <GameCard key={g.id} game={g} isAdmin={isAdmin}
+                    onDelete={deleteGame} onTogglePlayed={openRating}
+                    onEdit={g => { setEditingGame(g); setPanel("edit"); }}/>
+                ))}
+              </div>
+        }
+      </div>
+      {ratingGame && (
+        <div onClick={e => e.target===e.currentTarget && setRatingGame(null)}
+          style={{position:"fixed",top:0,left:0,right:0,bottom:0,
+            background:"rgba(0,0,0,0.65)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200}}>
+          <RatingModal game={ratingGame} onSave={saveRating} onClose={() => setRatingGame(null)}/>
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.render(<App/>, document.getElementById("root"));
+</script>
+</body>
+</html>
